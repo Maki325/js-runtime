@@ -44,6 +44,7 @@ macro_rules! fake_clone {
     unsafe { &mut *(((($data as *mut $t) as *mut usize).clone()) as *mut $t) }
   };
 }
+pub(crate) use fake_clone;
 
 pub fn get_runtime<'s>() -> &'s mut Runtime {
   return RUNTIME.with_borrow_mut(|rt| {
@@ -51,13 +52,13 @@ pub fn get_runtime<'s>() -> &'s mut Runtime {
   });
 }
 
-pub fn handle_scope<'s>() -> v8::HandleScope<'s> {
+pub fn handle_scope() -> &'static mut v8::HandleScope<'static> {
   return RUNTIME.with_borrow_mut(|rt| {
     let rt = rt.get_mut().unwrap();
     // let data = rt.get_data_mut();
     let data = get_data_mut!(rt);
-    let isolate = &mut data.isolate;
-    return v8::HandleScope::with_context(isolate, &data.context);
+    let a = &mut *data.handle_scope;
+    return fake_clone!({ a }, v8::HandleScope<'static>);
   });
 }
 

@@ -78,7 +78,7 @@ pub fn set_timeout(
     println!("A 1");
     tokio::time::sleep(std::time::Duration::from_millis(timeout)).await;
     println!("A 2");
-    let handle_scope = &mut crate::prelude::handle_scope();
+    let handle_scope = crate::prelude::handle_scope();
     let callback = c.clone().0 as *mut v8::Global<v8::Function>;
     let callback = unsafe { &mut *callback };
     let callback = v8::Local::new(handle_scope, callback.clone());

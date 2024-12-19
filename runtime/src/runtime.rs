@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{module_map::ModuleMap, Module};
+use crate::{module_map::ModuleMap, prelude, Module};
 
 fn dynamic_import<'s>(
   ctx: &mut v8::HandleScope<'s>,
@@ -29,16 +29,24 @@ pub struct Runtime {
 pub(crate) struct RuntimeData {
   pub(crate) isolate: v8::OwnedIsolate,
   pub(crate) context: v8::Global<v8::Context>,
+  pub(crate) handle_scope: &'static mut v8::HandleScope<'static>,
 }
 
 impl RuntimeData {
   pub fn new() -> RuntimeData {
     let mut isolate = v8::Isolate::new(v8::CreateParams::default());
     isolate.set_host_import_module_dynamically_callback(dynamic_import);
+    let isolate2 = prelude::fake_clone!({ &mut isolate }, v8::OwnedIsolate);
 
     let context = Self::setup_context(&mut isolate);
 
-    let mut runtime_data = RuntimeData { isolate, context };
+    let handle_scope = Box::leak(Box::new(v8::HandleScope::with_context(isolate2, &context)));
+
+    let mut runtime_data = RuntimeData {
+      isolate,
+      context,
+      handle_scope,
+    };
 
     let module_map = ModuleMap::new();
 
@@ -81,7 +89,11 @@ extern "C" fn promise_hook(
   let value = promise.get_private(handle_scope, private);
   println!("Value: {value:#?}");
   if let Some(value) = value {
-    println!("Value some: {value:#?} | Is number: {}", value.is_number());
+    println!(
+      "Value some: {value:#?} | {:#?} | Is number: {}",
+      value.type_repr(),
+      value.is_number()
+    );
     if value.is_number() {
       println!("Value Number: {:#?}", value.number_value(handle_scope));
     }

@@ -109,10 +109,11 @@ impl ModuleMap {
     let module_map = &mut crate::prelude::get_runtime().map;
     println!("HEREE 2!");
     // let module_map = unsafe { &mut *(*ctx.get_slot::<*mut Self>().unwrap()) };
-    let mut scope = unsafe { v8::CallbackScope::new(ctx) };
+    // let mut scope = unsafe { v8::CallbackScope::new(ctx) };
+    let mut handle_scope = crate::prelude::handle_scope();
     println!("HEREE 3!");
 
-    let path = specifier.to_rust_string_lossy(&mut scope);
+    let path = specifier.to_rust_string_lossy(handle_scope);
 
     let path = {
       let mut base_path = Path::new(
@@ -144,14 +145,14 @@ impl ModuleMap {
           .module
           .clone()
       };
-      return Some(v8::Local::new(&mut scope, module));
+      return Some(v8::Local::new(handle_scope, module));
     }
 
     println!("HERE 4!!!!!");
     let module = module_map.get_module(&path);
     println!("HERE 5!!!!!");
 
-    let mut ctx = unsafe { v8::CallbackScope::new(ctx) };
-    return module.map(|m| v8::Local::new(&mut ctx, m.module.clone()));
+    // let mut ctx = unsafe { v8::CallbackScope::new(ctx) };
+    return module.map(|m| v8::Local::new(handle_scope, m.module.clone()));
   }
 }
