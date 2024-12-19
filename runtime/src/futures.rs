@@ -8,6 +8,8 @@ impl std::future::Future for Promise {
     self: std::pin::Pin<&mut Self>,
     cx: &mut std::task::Context<'_>,
   ) -> std::task::Poll<Self::Output> {
+    let rt = crate::prelude::get_runtime();
+
     let result = {
       let (result, id) = {
         let handle_scope = crate::prelude::handle_scope();
@@ -44,9 +46,6 @@ impl std::future::Future for Promise {
           // }
           // v8::Local::<v8::Function>
 
-          let private_name = v8::String::new(handle_scope, "WakerKey").unwrap();
-          let private = v8::Private::new(handle_scope, Some(private_name));
-
           // let context_scope = &mut v8::ContextScope::new(handle_scope, context);
           // if let Some(val) = promise.get_private(context_scope, private) {
           //   // rt.insert_waker(
@@ -59,7 +58,7 @@ impl std::future::Future for Promise {
           //   // promise.set_private(context_scope, private, value.into());
           // }
           let id = promise
-            .get_private(handle_scope, private)
+            .get_private(handle_scope, rt.waker_key())
             .map(|val| val.to_number(handle_scope).unwrap().value() as u32);
 
           (std::task::Poll::Pending, id)
@@ -70,16 +69,13 @@ impl std::future::Future for Promise {
 
       if let std::task::Poll::Pending = result {
         let should_set_id = id.is_none();
-        let rt = crate::prelude::get_runtime();
         let id = rt.insert_waker(cx.waker().clone(), id);
         if should_set_id {
           let handle_scope = crate::prelude::handle_scope();
           let promise = v8::Local::new(handle_scope, self.promise.clone());
-          let private_name = v8::String::new(handle_scope, "WakerKey").unwrap();
-          let private = v8::Private::new(handle_scope, Some(private_name));
           let value = v8::Number::new(handle_scope, id as f64);
 
-          promise.set_private(handle_scope, private, value.into());
+          promise.set_private(handle_scope, rt.waker_key(), value.into());
         }
       }
 

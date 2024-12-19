@@ -30,6 +30,7 @@ pub(crate) struct RuntimeData {
   pub(crate) isolate: v8::OwnedIsolate,
   pub(crate) context: v8::Global<v8::Context>,
   pub(crate) handle_scope: &'static mut v8::HandleScope<'static>,
+  pub(crate) waker_key: v8::Global<v8::Private>,
 }
 
 impl RuntimeData {
@@ -42,10 +43,15 @@ impl RuntimeData {
 
     let handle_scope = Box::leak(Box::new(v8::HandleScope::with_context(isolate2, &context)));
 
+    let private_name = v8::String::new(handle_scope, "WakerKey").unwrap();
+    let private = v8::Private::new(handle_scope, Some(private_name));
+    let waker_key = v8::Global::new(&mut isolate, private);
+
     let mut runtime_data = RuntimeData {
       isolate,
       context,
       handle_scope,
+      waker_key,
     };
 
     let module_map = ModuleMap::new();
@@ -80,13 +86,13 @@ extern "C" fn promise_hook(
 ) {
   println!("PromiseHookType: {promise_hook_type:#?}, promise: {promise:#?}, parent: {parent:#?}");
   let handle_scope = &mut crate::prelude::handle_scope();
+  let waker_key = crate::prelude::get_runtime().waker_key();
+  println!("waker_key: {waker_key:#?}");
   println!(
     "In? PromiseHookType: {promise_hook_type:#?}, promise: {promise:#?}, parent: {parent:#?}"
   );
-  let private_name = v8::String::new(handle_scope, "WakerKey").unwrap();
-  let private = v8::Private::new(handle_scope, Some(private_name));
 
-  let value = promise.get_private(handle_scope, private);
+  let value = promise.get_private(handle_scope, waker_key);
   println!("Value: {value:#?}");
   if let Some(value) = value {
     println!(
@@ -143,6 +149,12 @@ impl Runtime {
     let handle_scope = &mut v8::HandleScope::new(&mut unsafe { &mut *self.data }.isolate);
     let context = v8::Local::new(handle_scope, unsafe { &mut *self.data }.context.clone());
     return f(handle_scope, context);
+  }
+
+  pub fn waker_key(&self) -> v8::Local<'_, v8::Private> {
+    let a = prelude::get_data_mut!(self);
+    let isolate = &mut *a.handle_scope;
+    return v8::Local::new(isolate, a.waker_key.clone());
   }
 
   pub fn insert_waker(&mut self, waker: std::task::Waker, id: Option<u32>) -> u32 {
