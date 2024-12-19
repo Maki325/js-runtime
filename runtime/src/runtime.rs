@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 
-use crate::{module_map::ModuleMap, prelude, Module};
+use crate::{
+  module_map::ModuleMap,
+  prelude::{self, fake_clone},
+  Module,
+};
 
 fn dynamic_import<'s>(
   ctx: &mut v8::HandleScope<'s>,
@@ -30,6 +34,7 @@ pub(crate) struct RuntimeData {
   pub(crate) isolate: v8::OwnedIsolate,
   pub(crate) context: v8::Global<v8::Context>,
   pub(crate) handle_scope: &'static mut v8::HandleScope<'static>,
+  // pub(crate) waker_key: &'static mut v8::Local<'static, v8::Private>,
   pub(crate) waker_key: v8::Global<v8::Private>,
 }
 
@@ -45,6 +50,7 @@ impl RuntimeData {
 
     let private_name = v8::String::new(handle_scope, "WakerKey").unwrap();
     let private = v8::Private::new(handle_scope, Some(private_name));
+    // let waker_key = Box::leak(Box::new(private));
     let waker_key = v8::Global::new(&mut isolate, private);
 
     let mut runtime_data = RuntimeData {
@@ -86,7 +92,8 @@ extern "C" fn promise_hook(
 ) {
   println!("PromiseHookType: {promise_hook_type:#?}, promise: {promise:#?}, parent: {parent:#?}");
   let handle_scope = &mut crate::prelude::handle_scope();
-  let waker_key = crate::prelude::get_runtime().waker_key();
+  let rt = crate::prelude::get_runtime();
+  let waker_key = rt.waker_key();
   println!("waker_key: {waker_key:#?}");
   println!(
     "In? PromiseHookType: {promise_hook_type:#?}, promise: {promise:#?}, parent: {parent:#?}"
@@ -101,7 +108,11 @@ extern "C" fn promise_hook(
       value.is_number()
     );
     if value.is_number() {
-      println!("Value Number: {:#?}", value.number_value(handle_scope));
+      let id = value.number_value(handle_scope);
+      println!("Value Number: {id:#?}");
+      if let Some(id) = id {
+        rt.wake(id as u32);
+      }
     }
   }
 }
@@ -151,10 +162,28 @@ impl Runtime {
     return f(handle_scope, context);
   }
 
-  pub fn waker_key(&self) -> v8::Local<'_, v8::Private> {
+  pub fn waker_key(&mut self) -> v8::Local<'_, v8::Private> {
+    // Static key
+    // let a = prelude::get_data_mut!(self);
+    // let waker_key = &mut *a.waker_key;
+    // let a = fake_clone!({ waker_key }, v8::Local<'_, v8::Private>);
+    // return *a;
+
+    // Regen every time
+    // let handle_scope = self.handle_scope();
+    // let private_name = v8::String::new(handle_scope, "WakerKey").unwrap();
+    // let private = v8::Private::new(handle_scope, Some(private_name));
+    // return private;
+
+    // Use global key
     let a = prelude::get_data_mut!(self);
-    let isolate = &mut *a.handle_scope;
-    return v8::Local::new(isolate, a.waker_key.clone());
+    return v8::Local::new(a.handle_scope, a.waker_key.clone());
+  }
+
+  pub fn handle_scope(&mut self) -> &'static mut v8::HandleScope<'static> {
+    let data = crate::prelude::get_data_mut!(self);
+    let a = &mut *data.handle_scope;
+    return fake_clone!({ a }, v8::HandleScope<'static>);
   }
 
   pub fn insert_waker(&mut self, waker: std::task::Waker, id: Option<u32>) -> u32 {
@@ -167,5 +196,9 @@ impl Runtime {
       self.waker_map.insert(id, waker);
       return id;
     }
+  }
+
+  pub fn wake(&mut self, id: u32) {
+    self.waker_map.remove(&id).unwrap().wake_by_ref();
   }
 }

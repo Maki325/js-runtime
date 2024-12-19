@@ -100,7 +100,7 @@ impl ModuleMap {
   }
 
   fn resolve_module<'s>(
-    ctx: v8::Local<'s, v8::Context>,
+    _ctx: v8::Local<'s, v8::Context>,
     specifier: v8::Local<'s, v8::String>,
     _import_assertions: v8::Local<'s, v8::FixedArray>,
     referrer: v8::Local<'s, v8::Module>,
@@ -110,7 +110,7 @@ impl ModuleMap {
     println!("HEREE 2!");
     // let module_map = unsafe { &mut *(*ctx.get_slot::<*mut Self>().unwrap()) };
     // let mut scope = unsafe { v8::CallbackScope::new(ctx) };
-    let mut handle_scope = crate::prelude::handle_scope();
+    let handle_scope = crate::prelude::handle_scope();
     println!("HEREE 3!");
 
     let path = specifier.to_rust_string_lossy(handle_scope);

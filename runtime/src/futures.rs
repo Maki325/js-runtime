@@ -57,9 +57,17 @@ impl std::future::Future for Promise {
           //   // let value = v8::Number::new(handle_scope, 5 as f64);
           //   // promise.set_private(context_scope, private, value.into());
           // }
-          let id = promise
-            .get_private(handle_scope, rt.waker_key())
-            .map(|val| val.to_number(handle_scope).unwrap().value() as u32);
+          let id = match promise.get_private(handle_scope, rt.waker_key()) {
+            Some(val) => {
+              println!("val: {val:#?} {:#?}", val.type_repr());
+              if val.is_number() {
+                Some(val.to_number(handle_scope).unwrap().value() as u32)
+              } else {
+                None
+              }
+            }
+            None => None,
+          };
 
           (std::task::Poll::Pending, id)
         } else {
@@ -67,6 +75,7 @@ impl std::future::Future for Promise {
         }
       };
 
+      println!("FUTURE RESULT: {result:#?} | ID: {id:#?}");
       if let std::task::Poll::Pending = result {
         let should_set_id = id.is_none();
         let id = rt.insert_waker(cx.waker().clone(), id);
@@ -74,6 +83,8 @@ impl std::future::Future for Promise {
           let handle_scope = crate::prelude::handle_scope();
           let promise = v8::Local::new(handle_scope, self.promise.clone());
           let value = v8::Number::new(handle_scope, id as f64);
+
+          println!("promise: {promise:#?}");
 
           promise.set_private(handle_scope, rt.waker_key(), value.into());
         }

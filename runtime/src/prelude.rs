@@ -40,13 +40,6 @@ macro_rules! get_data_mut {
 }
 pub(crate) use get_data_mut;
 
-macro_rules! get_data {
-  ($rt:ident) => {
-    unsafe { &mut *((($rt.data as *const usize).clone()) as *const crate::runtime::RuntimeData) }
-  };
-}
-pub(crate) use get_data;
-
 macro_rules! fake_clone {
   ($data:tt, $t:ty) => {
     unsafe { &mut *(((($data as *mut $t) as *mut usize).clone()) as *mut $t) }
