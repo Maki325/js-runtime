@@ -1,10 +1,17 @@
+use crate::{module_map::ModuleMap, Module};
 use std::collections::HashMap;
 
-use crate::{
-  module_map::ModuleMap,
-  prelude::{self, fake_clone},
-  Module,
-};
+macro_rules! get_data_mut {
+  ($rt:ident) => {
+    unsafe { &mut *((($rt.data as *mut usize).clone()) as *mut crate::runtime::RuntimeData) }
+  };
+}
+
+macro_rules! fake_clone {
+  ($data:tt, $t:ty) => {
+    unsafe { &mut *(((($data as *mut $t) as *mut usize).clone()) as *mut $t) }
+  };
+}
 
 fn dynamic_import<'s>(
   ctx: &mut v8::HandleScope<'s>,
@@ -32,9 +39,9 @@ pub struct Runtime {
 #[derive(Debug)]
 pub(crate) struct RuntimeData {
   pub(crate) isolate: v8::OwnedIsolate,
+  #[allow(dead_code)]
   pub(crate) context: v8::Global<v8::Context>,
   pub(crate) handle_scope: &'static mut v8::HandleScope<'static>,
-  // pub(crate) waker_key: &'static mut v8::Local<'static, v8::Private>,
   pub(crate) waker_key: v8::Global<v8::Private>,
 }
 
@@ -42,15 +49,16 @@ impl RuntimeData {
   pub fn new() -> RuntimeData {
     let mut isolate = v8::Isolate::new(v8::CreateParams::default());
     isolate.set_host_import_module_dynamically_callback(dynamic_import);
-    let isolate2 = prelude::fake_clone!({ &mut isolate }, v8::OwnedIsolate);
-
     let context = Self::setup_context(&mut isolate);
 
-    let handle_scope = Box::leak(Box::new(v8::HandleScope::with_context(isolate2, &context)));
+    let isolate_clone = fake_clone!({ &mut isolate }, v8::OwnedIsolate);
+    let handle_scope = Box::leak(Box::new(v8::HandleScope::with_context(
+      isolate_clone,
+      &context,
+    )));
 
     let private_name = v8::String::new(handle_scope, "WakerKey").unwrap();
     let private = v8::Private::new(handle_scope, Some(private_name));
-    // let waker_key = Box::leak(Box::new(private));
     let waker_key = v8::Global::new(&mut isolate, private);
 
     let mut runtime_data = RuntimeData {
@@ -88,29 +96,21 @@ impl RuntimeData {
 extern "C" fn promise_hook(
   promise_hook_type: v8::PromiseHookType,
   promise: v8::Local<'_, v8::Promise>,
-  parent: v8::Local<'_, v8::Value>,
+  _parent: v8::Local<'_, v8::Value>,
 ) {
-  println!("PromiseHookType: {promise_hook_type:#?}, promise: {promise:#?}, parent: {parent:#?}");
+  if promise_hook_type != v8::PromiseHookType::Resolve {
+    return;
+  }
   let handle_scope = &mut crate::prelude::handle_scope();
-  let rt = crate::prelude::get_runtime();
+  let rt = Runtime::get();
   let waker_key = rt.waker_key();
-  println!("waker_key: {waker_key:#?}");
-  println!(
-    "In? PromiseHookType: {promise_hook_type:#?}, promise: {promise:#?}, parent: {parent:#?}"
-  );
 
   let value = promise.get_private(handle_scope, waker_key);
-  println!("Value: {value:#?}");
   if let Some(value) = value {
-    println!(
-      "Value some: {value:#?} | {:#?} | Is number: {}",
-      value.type_repr(),
-      value.is_number()
-    );
     if value.is_number() {
       let id = value.number_value(handle_scope);
-      println!("Value Number: {id:#?}");
       if let Some(id) = id {
+        promise.delete_private(handle_scope, waker_key);
         rt.wake(id as u32);
       }
     }
@@ -125,8 +125,6 @@ impl Drop for RuntimeData {
     if let Some(module_map) = isolate.remove_slot::<ModuleMap>() {
       module_map.drain();
     }
-
-    // drop(isolate);
   }
 }
 
@@ -141,49 +139,37 @@ impl Runtime {
     };
   }
 
-  pub fn module_from_file<'a>(&'a mut self, path: &str) -> Option<&'a mut Module> {
-    // let handle_scope = &mut v8::HandleScope::new(&mut unsafe { &mut *self.data }.isolate);
-    // handle_scope.set_slot(self.data);
-
+  pub fn module_from_file<'a>(
+    &'a mut self,
+    path: &str,
+    reload: crate::module_map::Reload,
+  ) -> Option<&'a mut Module> {
     let path = std::path::absolute(path).unwrap();
     let path = path.to_str().unwrap();
 
-    // let context = v8::Local::new(handle_scope, unsafe { &mut *self.data }.context.clone());
-
-    return self.map.get_module(path);
+    return self.map.get_module(path, reload);
   }
 
-  pub fn with_handle_scope<R, F: Fn(&mut v8::HandleScope<'_, ()>, v8::Local<v8::Context>) -> R>(
-    &mut self,
-    f: F,
-  ) -> R {
-    let handle_scope = &mut v8::HandleScope::new(&mut unsafe { &mut *self.data }.isolate);
-    let context = v8::Local::new(handle_scope, unsafe { &mut *self.data }.context.clone());
-    return f(handle_scope, context);
+  pub fn context(&mut self) -> v8::Local<v8::Context> {
+    let data = get_data_mut!(self);
+    return v8::Local::new(data.handle_scope, data.context.clone());
   }
 
   pub fn waker_key(&mut self) -> v8::Local<'_, v8::Private> {
-    // Static key
-    // let a = prelude::get_data_mut!(self);
-    // let waker_key = &mut *a.waker_key;
-    // let a = fake_clone!({ waker_key }, v8::Local<'_, v8::Private>);
-    // return *a;
-
-    // Regen every time
-    // let handle_scope = self.handle_scope();
-    // let private_name = v8::String::new(handle_scope, "WakerKey").unwrap();
-    // let private = v8::Private::new(handle_scope, Some(private_name));
-    // return private;
-
-    // Use global key
-    let a = prelude::get_data_mut!(self);
+    let a = get_data_mut!(self);
     return v8::Local::new(a.handle_scope, a.waker_key.clone());
   }
 
   pub fn handle_scope(&mut self) -> &'static mut v8::HandleScope<'static> {
-    let data = crate::prelude::get_data_mut!(self);
-    let a = &mut *data.handle_scope;
-    return fake_clone!({ a }, v8::HandleScope<'static>);
+    let data = get_data_mut!(self);
+    let handle_scope = &mut *data.handle_scope;
+    return fake_clone!({ handle_scope }, v8::HandleScope<'static>);
+  }
+
+  pub fn make_global<T>(&mut self, local: v8::Local<T>) -> v8::Global<T> {
+    let data = get_data_mut!(self);
+    let isolate = &mut *data.isolate;
+    return v8::Global::new(isolate, local);
   }
 
   pub fn insert_waker(&mut self, waker: std::task::Waker, id: Option<u32>) -> u32 {
@@ -200,5 +186,11 @@ impl Runtime {
 
   pub fn wake(&mut self, id: u32) {
     self.waker_map.remove(&id).unwrap().wake_by_ref();
+  }
+
+  pub fn get<'s>() -> &'s mut Self {
+    return crate::prelude::RUNTIME.with_borrow_mut(|rt| {
+      return fake_clone!({ rt.get_mut().unwrap() }, crate::runtime::Runtime);
+    });
   }
 }

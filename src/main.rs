@@ -4,7 +4,7 @@ fn main() {
   {
     let mut runtime = runtime::Runtime::new();
     // let module = runtime.module_from_file("./test.js");
-    let module = runtime.module_from_file("./page.js");
+    let module = runtime.module_from_file("./page.js", runtime::Reload::No);
     println!("Module final: {module:#?}");
     // if let Some(module) = module {
     //   module.run_test();

@@ -3,7 +3,6 @@ use crate::{error::ModuleGetFunctionError, Result};
 #[derive(Debug)]
 pub struct Module {
   pub(crate) path: String,
-  // pub(crate) module: v8::Global<v8::Module>,
   pub module: v8::Global<v8::Module>,
 }
 

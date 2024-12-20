@@ -7,7 +7,7 @@ export function a() {
   <title>Yoooo</title>
 </head>
 <body>
-  <h1>HELLOOO</h1>
+  <h1>HELLOOO 222</h1>
 </body>
 </html>`;
 }

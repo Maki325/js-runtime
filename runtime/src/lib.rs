@@ -11,6 +11,7 @@ pub mod prelude;
 
 pub use error::Error;
 pub use module::Module;
+pub use module_map::Reload;
 pub use result::Result;
 pub use runtime::Runtime;
 

@@ -9,6 +9,12 @@ pub(crate) struct ModuleMap {
   path_to_module_id: HashMap<String, ModuleId>,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum Reload {
+  Yes,
+  No,
+}
+
 impl ModuleMap {
   pub fn new() -> ModuleMap {
     return ModuleMap {
@@ -22,18 +28,15 @@ impl ModuleMap {
     self.path_to_module_id.drain();
   }
 
-  pub fn get_module<'a, 'b>(&'a mut self, path: &str) -> Option<&'a mut Module>
+  pub fn get_module<'a, 'b>(&'a mut self, path: &str, reload: Reload) -> Option<&'a mut Module>
   where
     'a: 'b,
   {
-    println!("get_module 1!!!!");
     let module_exists = self.path_to_module_id.contains_key(path);
+    let rt = crate::Runtime::get();
+    let handle_scope = rt.handle_scope();
 
-    println!("get_module 2!!!!");
-    let handle_scope = &mut crate::prelude::handle_scope();
-    println!("get_module 3!!!!");
-
-    let stuff = if module_exists {
+    let stuff = if module_exists && reload != Reload::Yes {
       self
         .map
         .get_mut(self.path_to_module_id.get(path).unwrap())
@@ -79,9 +82,12 @@ impl ModuleMap {
       {
         let local_module = v8::Local::new(handle_scope, global_module);
 
+        let ctx = rt.context();
+        ctx.set_slot(reload);
         let instantiated = local_module
           .instantiate_module(handle_scope, Self::resolve_module)
           .unwrap();
+        ctx.remove_slot::<Reload>();
 
         if !instantiated {
           let mut lock = std::io::stderr().lock();
@@ -100,18 +106,14 @@ impl ModuleMap {
   }
 
   fn resolve_module<'s>(
-    _ctx: v8::Local<'s, v8::Context>,
+    ctx: v8::Local<'s, v8::Context>,
     specifier: v8::Local<'s, v8::String>,
     _import_assertions: v8::Local<'s, v8::FixedArray>,
     referrer: v8::Local<'s, v8::Module>,
   ) -> Option<v8::Local<'s, v8::Module>> {
-    println!("HEREE 1!");
-    let module_map = &mut crate::prelude::get_runtime().map;
-    println!("HEREE 2!");
-    // let module_map = unsafe { &mut *(*ctx.get_slot::<*mut Self>().unwrap()) };
-    // let mut scope = unsafe { v8::CallbackScope::new(ctx) };
+    let reload = *ctx.get_slot::<Reload>().unwrap();
+    let module_map = &mut crate::Runtime::get().map;
     let handle_scope = crate::prelude::handle_scope();
-    println!("HEREE 3!");
 
     let path = specifier.to_rust_string_lossy(handle_scope);
 
@@ -136,7 +138,7 @@ impl ModuleMap {
 
     let already_exists = module_map.path_to_module_id.contains_key(path);
 
-    if already_exists {
+    if already_exists && reload != Reload::Yes {
       let module = {
         module_map
           .map
@@ -148,11 +150,7 @@ impl ModuleMap {
       return Some(v8::Local::new(handle_scope, module));
     }
 
-    println!("HERE 4!!!!!");
-    let module = module_map.get_module(&path);
-    println!("HERE 5!!!!!");
-
-    // let mut ctx = unsafe { v8::CallbackScope::new(ctx) };
+    let module = module_map.get_module(&path, reload);
     return module.map(|m| v8::Local::new(handle_scope, m.module.clone()));
   }
 }
