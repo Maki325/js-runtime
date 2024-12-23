@@ -1,5 +1,5 @@
 use crate::{module_map::ModuleMap, Module};
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Mutex};
 
 macro_rules! get_data_mut {
   ($rt:ident) => {
@@ -45,11 +45,18 @@ pub(crate) struct RuntimeData {
   pub(crate) waker_key: v8::Global<v8::Private>,
 }
 
+extern "C" fn handle_reject(a: v8::PromiseRejectMessage<'_>) {
+  println!("REJECT!!! {a:#?}");
+}
+
 impl RuntimeData {
   pub fn new() -> RuntimeData {
     let mut isolate = v8::Isolate::new(v8::CreateParams::default());
     isolate.set_host_import_module_dynamically_callback(dynamic_import);
     let context = Self::setup_context(&mut isolate);
+
+    isolate.set_capture_stack_trace_for_uncaught_exceptions(true, 128);
+    isolate.set_promise_reject_callback(handle_reject);
 
     let isolate_clone = fake_clone!({ &mut isolate }, v8::OwnedIsolate);
     let handle_scope = Box::leak(Box::new(v8::HandleScope::with_context(
@@ -98,12 +105,17 @@ extern "C" fn promise_hook(
   promise: v8::Local<'_, v8::Promise>,
   _parent: v8::Local<'_, v8::Value>,
 ) {
+  println!("promise_hook_type {promise_hook_type:#?}, promise: {promise:#?}");
   if promise_hook_type != v8::PromiseHookType::Resolve {
     return;
   }
-  let handle_scope = &mut crate::prelude::handle_scope();
+  println!("promise_hook 2!!!");
   let rt = Runtime::get();
+  println!("promise_hook 3!!!");
+  let handle_scope = rt.handle_scope();
+  println!("promise_hook 4!!!");
   let waker_key = rt.waker_key();
+  println!("promise_hook 5!!!");
 
   let value = promise.get_private(handle_scope, waker_key);
   if let Some(value) = value {
@@ -111,6 +123,7 @@ extern "C" fn promise_hook(
       let id = value.number_value(handle_scope);
       if let Some(id) = id {
         promise.delete_private(handle_scope, waker_key);
+        println!("WAKEY WAKEY!!!");
         rt.wake(id as u32);
       }
     }
@@ -189,8 +202,35 @@ impl Runtime {
   }
 
   pub fn get<'s>() -> &'s mut Self {
-    return crate::prelude::RUNTIME.with_borrow_mut(|rt| {
-      return fake_clone!({ rt.get_mut().unwrap() }, crate::runtime::Runtime);
-    });
+    println!("Runtime::get()!!");
+    let ptr = {
+      let lock = crate::prelude::RUNTIME.lock().unwrap();
+      println!("lock: {lock:#?}");
+      lock.clone()
+    };
+    let rt = unsafe { &mut *((ptr as *mut usize) as *mut crate::Runtime) };
+    {
+      let mut lock = TEST.lock().unwrap();
+      if *lock >= 14 {
+        // panic!("Check");
+        // let handle_scope = rt.handle_scope();
+        // let stack_trace = v8::StackTrace::current_stack_trace(handle_scope, 128).unwrap();
+        // println!("Trace len: {:#?}", stack_trace.get_frame_count());
+        // for i in 0..stack_trace.get_frame_count() {
+        //   let frame = stack_trace.get_frame(handle_scope, i).unwrap();
+        //   println!(
+        //     "{:#?}:{}:{}",
+        //     frame.get_script_name(handle_scope),
+        //     frame.get_line_number(),
+        //     frame.get_column()
+        //   );
+        // }
+      } else {
+        *lock += 1;
+      }
+    }
+    return rt;
   }
 }
+
+static TEST: Mutex<usize> = Mutex::new(0);

@@ -8,8 +8,19 @@ use runtime::{v8, Runtime};
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 
-runtime::startup!(start);
-// runtime::startup!(testing);
+// runtime::startup!(start);
+runtime::startup!(testing);
+
+pub fn catcher(
+  handle_scope: &mut v8::HandleScope,
+  args: v8::FunctionCallbackArguments,
+  _rv: v8::ReturnValue,
+) {
+  println!("Error!");
+  for i in 0..args.length() {
+    println!("{i}: {:#?}", args.get(i).type_repr());
+  }
+}
 
 #[allow(unused)]
 async fn testing() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -31,6 +42,8 @@ async fn testing() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
       .unwrap();
 
     let promise = v8::Local::<v8::Promise>::try_from(returned_value).unwrap();
+    let catcher = v8::Function::new(handle_scope, catcher).unwrap();
+    promise.catch(handle_scope, catcher);
     runtime::futures::Promise {
       promise: v8::Global::new(handle_scope, promise),
     }

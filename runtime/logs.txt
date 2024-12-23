@@ -1,0 +1,89 @@
+#0  0x000055555574ca42 in v8::base::OS::Abort() () at ../../../../v8/src/base/platform/platform-posix.cc:712
+#1  0x000055555574ab42 in V8_Fatal(char const*, int, char const*, ...) () at ../../../../v8/src/base/logging.cc:215
+#2  0x000055555574a565 in v8::base::(anonymous namespace)::DefaultDcheckHandler(char const*, int, char const*) () at ../../../../v8/src/base/logging.cc:59
+#3  0x00005555557db1f4 in v8::internal::HandleScope::CreateHandle(v8::internal::Isolate*, unsigned long) () at ../../../../v8/src/handles/handles-inl.h:262
+#4  0x00005555557387bd in v8::LocalBase<v8::Data>::New(v8::Isolate*, unsigned long) () at ../../../../v8/include/v8-local-handle.h:203
+#5  0x000055555573fc87 in v8::LocalBase<v8::Data>::New(v8::Isolate*, v8::Data*) () at ../../../../v8/include/v8-local-handle.h:209
+#6  0x000055555573fbdd in v8::Local<v8::Data>::New(v8::Isolate*, v8::Data*) () at ../../../../v8/include/v8-local-handle.h:416
+#7  0x000055555572ff6d in v8::Local<v8::Data>::New(v8::Isolate*, v8::Local<v8::Data>) () at ../../../../v8/include/v8-local-handle.h:337
+#8  0x00005555557240f2 in v8__Local__New () at ../../../../src/binding.cc:396
+#9  0x00005555556b32f2 in v8::handle::Local<T>::new::{{closure}} (sd=0x5555595ceec0) at /home/marko/.cargo/registry/src/index.crates.io-6f17d22bba15001f/v8-129.0.0/src/handle.rs:100
+#10 0x00005555556e3a35 in v8::scope::HandleScope<()>::cast_local (self=0x5555595ca250, f=...) at /home/marko/.cargo/registry/src/index.crates.io-6f17d22bba15001f/v8-129.0.0/src/scope.rs:253
+#11 v8::handle::Local<T>::new (scope=0x5555595ca250, handle=...) at /home/marko/.cargo/registry/src/index.crates.io-6f17d22bba15001f/v8-129.0.0/src/handle.rs:99
+#12 runtime::intrinsics::set_timeout::{{closure}} () at runtime/src/intrinsics/mod.rs:86
+#13 0x00005555556f917f in tokio::runtime::task::core::Core<T,S>::poll::{{closure}} (ptr=0x5555595c8d30)
+    at /home/marko/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tokio-1.42.0/src/runtime/task/core.rs:331
+#14 0x00005555556f8eb1 in tokio::loom::std::unsafe_cell::UnsafeCell<T>::with_mut (self=0x5555595c8d30, f=...)
+    at /home/marko/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tokio-1.42.0/src/loom/std/unsafe_cell.rs:16
+#15 tokio::runtime::task::core::Core<T,S>::poll (self=0x5555595c8d20, cx=<error reading variable: Cannot access memory at address 0x0>)
+    at /home/marko/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tokio-1.42.0/src/runtime/task/core.rs:320
+#16 0x00005555556fafee in tokio::runtime::task::harness::poll_future::{{closure}} () at /home/marko/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tokio-1.42.0/src/runtime/task/harness.rs:499
+#17 0x0000555555701c91 in <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once (self=...)
+    at /home/marko/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:272
+#18 0x00005555556ff7a9 in std::panicking::try::do_call (data=0x7ffff4430528 " \215\\YUU")
+    at /home/marko/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:557
+#19 0x00005555556fe23b in __rust_try ()
+#20 0x00005555556fd636 in std::panicking::try (f=...) at /home/marko/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:520
+#21 std::panic::catch_unwind (f=...) at /home/marko/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:358
+#22 0x00005555556fa850 in tokio::runtime::task::harness::poll_future (core=0x5555595c8d20, cx=...)
+    at /home/marko/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tokio-1.42.0/src/runtime/task/harness.rs:487
+#23 0x00005555556fb6be in tokio::runtime::task::harness::Harness<T,S>::poll_inner (self=0x7ffff4430768)
+    at /home/marko/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tokio-1.42.0/src/runtime/task/harness.rs:209
+#24 0x00005555556fc1f7 in tokio::runtime::task::harness::Harness<T,S>::poll (self=...) at /home/marko/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tokio-1.42.0/src/runtime/task/harness.rs:154
+#25 0x0000555555700c8d in tokio::runtime::task::raw::poll (ptr=...) at /home/marko/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tokio-1.42.0/src/runtime/task/raw.rs:271
+#26 0x0000555558a0cf67 in tokio::runtime::task::raw::RawTask::poll (self=...) at src/runtime/task/raw.rs:201
+#27 0x0000555558a2b7e2 in tokio::runtime::task::LocalNotified<S>::run (self=...) at src/runtime/task/mod.rs:435
+#28 0x00005555589ed13d in tokio::runtime::scheduler::multi_thread::worker::Context::run_task::{{closure}} () at src/runtime/scheduler/multi_thread/worker.rs:596
+#29 0x00005555589ecf94 in tokio::runtime::coop::with_budget (budget=..., f=...) at src/runtime/coop.rs:107
+#30 tokio::runtime::coop::budget (f=...) at src/runtime/coop.rs:73
+#31 tokio::runtime::scheduler::multi_thread::worker::Context::run_task (self=0x7ffff4430dc8, task=..., core=0x55555953b590) at src/runtime/scheduler/multi_thread/worker.rs:595
+#32 0x00005555589ec663 in tokio::runtime::scheduler::multi_thread::worker::Context::run (self=0x7ffff4430dc8, core=0x55555953b590) at src/runtime/scheduler/multi_thread/worker.rs:546
+#33 0x00005555589ec2c9 in tokio::runtime::scheduler::multi_thread::worker::run::{{closure}}::{{closure}} () at src/runtime/scheduler/multi_thread/worker.rs:511
+#34 0x0000555558a07df0 in tokio::runtime::context::scoped::Scoped<T>::set (self=0x7ffff4432540, t=0x7ffff4430dc0, f=...) at src/runtime/context/scoped.rs:40
+#35 0x00005555589cb59b in tokio::runtime::context::set_scheduler::{{closure}} (c=0x7ffff4432518) at src/runtime/context.rs:180
+#36 0x0000555558a00340 in std::thread::local::LocalKey<T>::try_with (self=0x5555594bcf20, f=...)
+    at /home/marko/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/local.rs:283
+#37 0x00005555589feccb in std::thread::local::LocalKey<T>::with (self=0x5555594bcf20, f=<error reading variable: Cannot access memory at address 0x0>)
+    at /home/marko/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/local.rs:260
+#38 0x00005555589cb564 in tokio::runtime::context::set_scheduler (v=0x7ffff4430dc0, f=...) at src/runtime/context.rs:180
+#39 0x00005555589ec1d4 in tokio::runtime::scheduler::multi_thread::worker::run::{{closure}} () at src/runtime/scheduler/multi_thread/worker.rs:506
+#40 0x0000555558a25900 in tokio::runtime::context::runtime::enter_runtime (handle=0x7ffff4430fe8, allow_block_in_place=true, f=...) at src/runtime/context/runtime.rs:65
+#41 0x00005555589ebf75 in tokio::runtime::scheduler::multi_thread::worker::run (worker=Arc(strong=1, weak=0) = {...}) at src/runtime/scheduler/multi_thread/worker.rs:498
+--Type <RET> for more, q to quit, c to continue without paging--trace
+#42 0x00005555589ebcab in tokio::runtime::scheduler::multi_thread::worker::Launch::launch::{{closure}} () at src/runtime/scheduler/multi_thread/worker.rs:464
+#43 0x0000555558a107fe in <tokio::runtime::blocking::task::BlockingTask<T> as core::future::future::Future>::poll (self=..., _cx=0x7ffff44311c0) at src/runtime/blocking/task.rs:42
+#44 0x0000555558a09293 in tokio::runtime::task::core::Core<T,S>::poll::{{closure}} (ptr=0x555559544838) at src/runtime/task/core.rs:331
+#45 0x0000555558a08f91 in tokio::loom::std::unsafe_cell::UnsafeCell<T>::with_mut (self=0x555559544838, f=...) at src/loom/std/unsafe_cell.rs:16
+#46 tokio::runtime::task::core::Core<T,S>::poll (self=0x555559544820, cx=<error reading variable: Cannot access memory at address 0x0>) at src/runtime/task/core.rs:320
+#47 0x00005555589bf63e in tokio::runtime::task::harness::poll_future::{{closure}} () at src/runtime/task/harness.rs:499
+#48 0x0000555558a10de1 in <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once (self=...)
+    at /home/marko/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:272
+#49 0x00005555589faa49 in std::panicking::try::do_call (data=0x7ffff44312e8 " HTYUU") at /home/marko/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:557
+#50 0x0000555558a26e7b in __rust_try ()
+#51 0x0000555558a24d96 in std::panicking::try (f=...) at /home/marko/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:520
+#52 std::panic::catch_unwind (f=...) at /home/marko/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:358
+#53 0x00005555589bf1c0 in tokio::runtime::task::harness::poll_future (core=0x555559544820, cx=...) at src/runtime/task/harness.rs:487
+#54 0x00005555589bdf6e in tokio::runtime::task::harness::Harness<T,S>::poll_inner (self=0x7ffff4431528) at src/runtime/task/harness.rs:209
+#55 0x00005555589bddc7 in tokio::runtime::task::harness::Harness<T,S>::poll (self=...) at src/runtime/task/harness.rs:154
+#56 0x0000555558a0d17d in tokio::runtime::task::raw::poll (ptr=...) at src/runtime/task/raw.rs:271
+#57 0x0000555558a0cf67 in tokio::runtime::task::raw::RawTask::poll (self=...) at src/runtime/task/raw.rs:201
+#58 0x0000555558a2b8a7 in tokio::runtime::task::UnownedTask<S>::run (self=...) at src/runtime/task/mod.rs:472
+#59 0x0000555558a0d6a7 in tokio::runtime::blocking::pool::Task::run (self=...) at src/runtime/blocking/pool.rs:161
+#60 0x0000555558a0fd7e in tokio::runtime::blocking::pool::Inner::run (self=0x55555950fe60, worker_thread_id=0) at src/runtime/blocking/pool.rs:511
+#61 0x0000555558a0fa94 in tokio::runtime::blocking::pool::Spawner::spawn_thread::{{closure}} () at src/runtime/blocking/pool.rs:469
+#62 0x00005555589fea86 in std::sys::backtrace::__rust_begin_short_backtrace (f=...) at /home/marko/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/sys/backtrace.rs:154
+#63 0x00005555589dfe02 in std::thread::Builder::spawn_unchecked_::{{closure}}::{{closure}} ()
+    at /home/marko/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/mod.rs:538
+#64 0x0000555558a10ca2 in <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once (self=...)
+    at /home/marko/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:272
+#65 0x00005555589faba3 in std::panicking::try::do_call (data=0x7ffff4431b68 "\001") at /home/marko/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:557
+#66 0x00005555589e478b in __rust_try ()
+#67 0x00005555589dfa53 in std::panicking::try (f=...) at /home/marko/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:520
+#68 std::panic::catch_unwind (f=...) at /home/marko/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:358
+#69 std::thread::Builder::spawn_unchecked_::{{closure}} () at /home/marko/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/mod.rs:537
+#70 0x0000555558a195cf in core::ops::function::FnOnce::call_once{{vtable-shim}} () at /home/marko/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250
+#71 0x0000555558a7f8bb in <alloc::boxed::Box<F,A> as core::ops::function::FnOnce<Args>>::call_once () at alloc/src/boxed.rs:2454
+#72 <alloc::boxed::Box<F,A> as core::ops::function::FnOnce<Args>>::call_once () at alloc/src/boxed.rs:2454
+#73 std::sys::pal::unix::thread::Thread::new::thread_start () at std/src/sys/pal/unix/thread.rs:105
+#74 0x00007ffff7f91609 in start_thread (arg=<optimized out>) at pthread_create.c:477
+#75 0x00007ffff7d61353 in clone () at ../sysdeps/unix/sysv/linux/x86_64/clone.S:95

@@ -45,9 +45,13 @@ impl ModuleMap {
       let (id, global_module) = {
         let specifier = v8::String::new(handle_scope, path).unwrap();
 
+        eprintln!("Path! {path}");
         let source = v8::String::new(
           handle_scope,
-          std::fs::read_to_string(path).unwrap().as_str(),
+          std::fs::read_to_string(path)
+            .map_err(|_| format!("No file \"{path}\"!"))
+            .unwrap()
+            .as_str(),
         )
         .unwrap();
 

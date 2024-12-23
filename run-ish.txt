@@ -1,0 +1,1 @@
+V8_FORCE_DEBUG=true RUST_BACKTRACE=1 cargo build

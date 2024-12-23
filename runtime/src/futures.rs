@@ -10,9 +10,11 @@ impl std::future::Future for Promise {
     self: std::pin::Pin<&mut Self>,
     cx: &mut std::task::Context<'_>,
   ) -> std::task::Poll<Self::Output> {
+    println!("Promise HERE!!!");
     let rt = crate::Runtime::get();
+    println!("Promise HERE 2!!!!");
 
-    let handle_scope = crate::prelude::handle_scope();
+    let handle_scope = rt.handle_scope();
     let promise = v8::Local::new(handle_scope, self.promise.clone());
 
     if promise.state() != v8::PromiseState::Pending {
