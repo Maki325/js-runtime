@@ -28,13 +28,14 @@ impl ModuleMap {
     self.path_to_module_id.drain();
   }
 
-  pub fn get_module<'a, 'b>(&'a mut self, path: &str, reload: Reload) -> Option<&'a mut Module>
-  where
-    'a: 'b,
-  {
+  pub fn get_module<'a>(
+    &'a mut self,
+    handle_scope: &mut v8::HandleScope,
+    path: &str,
+    reload: Reload,
+  ) -> Option<&'a mut Module> {
     let module_exists = self.path_to_module_id.contains_key(path);
     let rt = crate::Runtime::get();
-    let handle_scope = rt.handle_scope();
 
     let stuff = if module_exists && reload != Reload::Yes {
       self
@@ -82,10 +83,11 @@ impl ModuleMap {
       {
         let local_module = v8::Local::new(handle_scope, global_module);
 
-        let ctx = rt.context();
+        let tc = &mut v8::TryCatch::new(handle_scope);
+        let ctx = rt.context(tc);
         ctx.set_slot(reload);
         let instantiated = local_module
-          .instantiate_module(handle_scope, Self::resolve_module)
+          .instantiate_module(tc, Self::resolve_module)
           .unwrap();
         ctx.remove_slot::<Reload>();
 
@@ -96,7 +98,16 @@ impl ModuleMap {
           return None;
         }
 
-        local_module.evaluate(handle_scope).unwrap();
+        if let Some(_exception) = tc.exception() {
+          eprintln!("There was an exception instantiating module!");
+          return None;
+        }
+
+        local_module.evaluate(tc).unwrap();
+        if let Some(_exception) = tc.exception() {
+          eprintln!("There was an exception evaluating module!");
+          return None;
+        }
       }
 
       self.map.get_mut(&id).unwrap()
@@ -112,10 +123,10 @@ impl ModuleMap {
     referrer: v8::Local<'s, v8::Module>,
   ) -> Option<v8::Local<'s, v8::Module>> {
     let reload = *ctx.get_slot::<Reload>().unwrap();
+    let callback_scope = &mut unsafe { v8::CallbackScope::new(ctx) };
     let module_map = &mut crate::Runtime::get().map;
-    let handle_scope = crate::prelude::handle_scope();
 
-    let path = specifier.to_rust_string_lossy(handle_scope);
+    let path = specifier.to_rust_string_lossy(callback_scope);
 
     let path = {
       let mut base_path = Path::new(
@@ -147,10 +158,10 @@ impl ModuleMap {
           .module
           .clone()
       };
-      return Some(v8::Local::new(handle_scope, module));
+      return Some(v8::Local::new(callback_scope, module));
     }
 
-    let module = module_map.get_module(&path, reload);
-    return module.map(|m| v8::Local::new(handle_scope, m.module.clone()));
+    let module = module_map.get_module(callback_scope, &path, reload);
+    return module.map(|m| v8::Local::new(callback_scope, m.module.clone()));
   }
 }

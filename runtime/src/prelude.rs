@@ -8,6 +8,15 @@ pub fn handle_scope() -> &'static mut v8::HandleScope<'static> {
   return RUNTIME.with_borrow_mut(|rt| rt.get_mut().unwrap().handle_scope());
 }
 
+pub fn context_scope<'s>() -> v8::ContextScope<'s, v8::HandleScope<'static>> {
+  return RUNTIME.with_borrow_mut(|rt| {
+    let rt = rt.get_mut().unwrap();
+    let handle_scope = rt.handle_scope();
+    let ctx = rt.context(handle_scope);
+    return v8::ContextScope::new(handle_scope, ctx);
+  });
+}
+
 pub fn setup() {
   RUNTIME.with(|rt| {
     if let Some(_) = rt.borrow().get() {

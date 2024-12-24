@@ -65,14 +65,14 @@ pub fn set_timeout(
   let timeout = timeout.to_number(handle_scope).unwrap();
 
   let callback = v8::Global::new(handle_scope, callback);
-  let callback = A(Box::leak(Box::new(callback)) as *mut dyn std::any::Any);
+  let callback =
+    Box::leak(Box::new(callback)) as *mut v8::Global<v8::Function> as *mut usize as usize;
   let timeout = timeout.value() as u64;
 
   tokio::spawn(async move {
     tokio::time::sleep(std::time::Duration::from_millis(timeout)).await;
     let handle_scope = crate::prelude::handle_scope();
-    let callback = callback.clone().0 as *mut v8::Global<v8::Function>;
-    let callback = unsafe { &mut *callback };
+    let callback = unsafe { &mut *(callback as *mut v8::Global<v8::Function>) };
     let callback = v8::Local::new(handle_scope, callback.clone());
 
     let this = v8::null(handle_scope);
@@ -80,6 +80,10 @@ pub fn set_timeout(
   });
 }
 
-#[derive(Clone)]
-pub struct A(*mut dyn std::any::Any);
-unsafe impl Send for A {}
+pub fn log(
+  handle_scope: &mut v8::HandleScope,
+  args: v8::FunctionCallbackArguments,
+  _rv: v8::ReturnValue,
+) {
+  println!("[LOG]: {}", args.get(0).to_rust_string_lossy(handle_scope));
+}

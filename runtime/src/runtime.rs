@@ -34,6 +34,9 @@ pub struct Runtime {
 
   pub(crate) waker_id: u32,
   pub(crate) waker_map: HashMap<u32, std::task::Waker>,
+
+  pub(crate) enqueue_id: u32,
+  pub(crate) enqueue_map: HashMap<u32, tokio::sync::mpsc::Sender<std::io::Result<String>>>,
 }
 
 #[derive(Debug)]
@@ -83,10 +86,15 @@ impl RuntimeData {
     {
       let context_scope = &mut v8::ContextScope::new(handle_scope, context);
 
-      let set_timeout = v8::Function::new(context_scope, crate::intrinsics::set_timeout).unwrap();
       let global_obj = context.global(context_scope);
+
+      let set_timeout = v8::Function::new(context_scope, crate::intrinsics::set_timeout).unwrap();
       let name = v8::String::new(context_scope, "setTimeout").unwrap().into();
       global_obj.set(context_scope, name, set_timeout.into());
+
+      let log = v8::Function::new(context_scope, crate::intrinsics::log).unwrap();
+      let name = v8::String::new(context_scope, "log").unwrap().into();
+      global_obj.set(context_scope, name, log.into());
     }
 
     return v8::Global::new(handle_scope, context);
@@ -98,12 +106,13 @@ extern "C" fn promise_hook(
   promise: v8::Local<'_, v8::Promise>,
   _parent: v8::Local<'_, v8::Value>,
 ) {
+  let scope = &mut unsafe { v8::CallbackScope::new(promise) };
+  let handle_scope = &mut v8::HandleScope::new(scope);
   if promise_hook_type != v8::PromiseHookType::Resolve {
     return;
   }
-  let handle_scope = &mut crate::prelude::handle_scope();
   let rt = Runtime::get();
-  let waker_key = rt.waker_key();
+  let waker_key = rt.waker_key(handle_scope);
 
   let value = promise.get_private(handle_scope, waker_key);
   if let Some(value) = value {
@@ -136,6 +145,8 @@ impl Runtime {
 
       waker_id: 0,
       waker_map: HashMap::new(),
+      enqueue_id: 0,
+      enqueue_map: HashMap::new(),
     };
   }
 
@@ -146,18 +157,22 @@ impl Runtime {
   ) -> Option<&'a mut Module> {
     let path = std::path::absolute(path).unwrap();
     let path = path.to_str().unwrap();
+    let handle_scope = &mut self.context_scope();
 
-    return self.map.get_module(path, reload);
+    return self.map.get_module(handle_scope, path, reload);
   }
 
-  pub fn context(&mut self) -> v8::Local<v8::Context> {
+  pub fn context<'s>(&mut self, scope: &mut v8::HandleScope<'s, ()>) -> v8::Local<'s, v8::Context> {
     let data = get_data_mut!(self);
-    return v8::Local::new(data.handle_scope, data.context.clone());
+    return v8::Local::new(scope, data.context.clone());
   }
 
-  pub fn waker_key(&mut self) -> v8::Local<'_, v8::Private> {
+  pub fn waker_key<'s>(
+    &mut self,
+    scope: &mut v8::HandleScope<'s, ()>,
+  ) -> v8::Local<'s, v8::Private> {
     let a = get_data_mut!(self);
-    return v8::Local::new(a.handle_scope, a.waker_key.clone());
+    return v8::Local::new(scope, a.waker_key.clone());
   }
 
   pub fn handle_scope(&mut self) -> &'static mut v8::HandleScope<'static> {
@@ -166,11 +181,33 @@ impl Runtime {
     return fake_clone!({ handle_scope }, v8::HandleScope<'static>);
   }
 
+  pub fn handle_scope_new<'a>(&mut self) -> v8::HandleScope<'a> {
+    let data = get_data_mut!(self);
+    let handle_scope = &mut v8::HandleScope::new(&mut data.isolate);
+
+    let ctx = self.context(handle_scope);
+    let data2 = get_data_mut!(self);
+    return v8::HandleScope::with_context(&mut data2.isolate, ctx);
+    // return fake_clone!({ handle_scope }, v8::HandleScope<'static>);
+  }
+
+  pub fn context_scope<'s>(&mut self) -> v8::ContextScope<'s, v8::HandleScope<'static>> {
+    let handle_scope = self.handle_scope();
+    let ctx = self.context(handle_scope);
+    return v8::ContextScope::new(handle_scope, ctx);
+  }
+
   pub fn make_global<T>(&mut self, local: v8::Local<T>) -> v8::Global<T> {
     let data = get_data_mut!(self);
     let isolate = &mut *data.isolate;
     return v8::Global::new(isolate, local);
   }
+
+  // pub fn make_local<'s, T>(&mut self, global: v8::Global<T>) -> v8::Local<'s, T> {
+  //   let data = get_data_mut!(self);
+  //   let isolate = &mut *data.isolate;
+  //   return v8::Local::new(isolate, global);
+  // }
 
   pub fn insert_waker(&mut self, waker: std::task::Waker, id: Option<u32>) -> u32 {
     if let Some(id) = id {
@@ -186,6 +223,30 @@ impl Runtime {
 
   pub fn wake(&mut self, id: u32) {
     self.waker_map.remove(&id).unwrap().wake_by_ref();
+  }
+
+  pub fn insert_sender(
+    &mut self,
+    sender: tokio::sync::mpsc::Sender<std::io::Result<String>>,
+  ) -> u32 {
+    let id = self.enqueue_id;
+    self.enqueue_id += 1;
+    self.enqueue_map.insert(id, sender);
+    return id;
+  }
+
+  pub fn get_sender(
+    &mut self,
+    id: u32,
+  ) -> Option<&mut tokio::sync::mpsc::Sender<std::io::Result<String>>> {
+    return self.enqueue_map.get_mut(&id);
+  }
+
+  pub fn remove_sender(
+    &mut self,
+    id: u32,
+  ) -> Option<tokio::sync::mpsc::Sender<std::io::Result<String>>> {
+    return self.enqueue_map.remove(&id);
   }
 
   pub fn get<'s>() -> &'s mut Self {
