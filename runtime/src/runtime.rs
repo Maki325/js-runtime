@@ -203,12 +203,6 @@ impl Runtime {
     return v8::Global::new(isolate, local);
   }
 
-  // pub fn make_local<'s, T>(&mut self, global: v8::Global<T>) -> v8::Local<'s, T> {
-  //   let data = get_data_mut!(self);
-  //   let isolate = &mut *data.isolate;
-  //   return v8::Local::new(isolate, global);
-  // }
-
   pub fn insert_waker(&mut self, waker: std::task::Waker, id: Option<u32>) -> u32 {
     if let Some(id) = id {
       self.waker_map.insert(id, waker);
@@ -247,6 +241,22 @@ impl Runtime {
     id: u32,
   ) -> Option<tokio::sync::mpsc::Sender<std::io::Result<String>>> {
     return self.enqueue_map.remove(&id);
+  }
+
+  pub fn add_global_fn(
+    &mut self,
+    name: crate::FastStaticString,
+    f: impl v8::MapFnTo<v8::FunctionCallback>,
+  ) {
+    let handle_scope = self.handle_scope();
+    let context = self.context(handle_scope);
+    let context_scope = &mut v8::ContextScope::new(handle_scope, context);
+
+    let global_obj = context.global(context_scope);
+
+    let f = v8::Function::new(context_scope, f).unwrap();
+    let name = name.v8_string(context_scope);
+    global_obj.set(context_scope, name.into(), f.into());
   }
 
   pub fn get<'s>() -> &'s mut Self {

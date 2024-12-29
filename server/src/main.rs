@@ -7,15 +7,19 @@ use runtime::{v8, Runtime};
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 
+mod globals;
+
 runtime::startup!(start);
 // runtime::startup!(testing);
 
 #[allow(unused)]
 async fn testing() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
   let rt = Runtime::get();
+  add_globals(rt);
+
   let promise = {
     let module = rt
-      .module_from_file("./app/page.js", runtime::Reload::No)
+      .module_from_file("./app/test.js", runtime::Reload::No)
       .unwrap();
     let function = module.get_function("default").unwrap();
 
@@ -28,6 +32,12 @@ async fn testing() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
       .call(handle_scope, this.cast(), &[])
       .ok_or("\"default\" function returned an exception!")
       .unwrap();
+
+    println!(
+      "returned_value.type_repr(): {:#?} {:#?}",
+      returned_value.type_repr(),
+      returned_value.to_rust_string_lossy(handle_scope),
+    );
 
     let promise = v8::Local::<v8::Promise>::try_from(returned_value).unwrap();
     runtime::futures::Promise { promise }
@@ -83,6 +93,11 @@ async fn shutdown_signal() {
 
 #[allow(unused)]
 async fn start() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+  {
+    let rt = runtime::Runtime::get();
+    add_globals(rt);
+  }
+
   let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
 
   let listener = TcpListener::bind(addr).await?;
@@ -122,6 +137,27 @@ async fn start() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
   }
 
   Ok(())
+}
+
+fn add_globals(rt: &mut runtime::Runtime) {
+  rt.add_global_fn(
+    globals::stringify::FRAMEWORK_JS_STRINGIFY,
+    globals::stringify::framework_js_stringify,
+  );
+  rt.add_global_fn(
+    globals::style_name::FRAMEWORK_JS_STYLE_NAME,
+    globals::style_name::framework_js_style_name,
+  );
+  rt.add_global_fn(
+    globals::style_value::FRAMEWORK_JS_STYLE_VALUE,
+    globals::style_value::framework_js_style_value,
+  );
+  rt.add_global_fn(
+    globals::style_object::FRAMEWORK_JS_STYLE_OBJECT,
+    globals::style_object::framework_js_style_object,
+  );
+
+  rt.add_global_fn(globals::test::TEST, globals::test::test);
 }
 
 #[allow(unused)]

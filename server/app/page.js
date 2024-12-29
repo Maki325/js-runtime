@@ -1,10 +1,8 @@
-import './impl.js';
-
 async function Coffee({ hotOrIced, children }) {
   // const url = `https://api.sampleapis.com/coffee/${hotOrIced}`;
   // const res = await fetch(url);
   // const coffees = await res.json();
-  await new Promise((resolve) => setTimeout(() => resolve(), 3_000));
+  await new Promise((resolve) => setTimeout(() => resolve(), 300));
   return (() => {
     const _6DagR6BQRUlJATr7 = [];
     return [
@@ -45,7 +43,7 @@ const common = {
 
       Hello
 
-      <b style="background-color: #fefefe;border-radius: 10px;padding: 0 5;${globalThis.___FRAMEWORK_JS_STYLE_OBJECT___(bStyle)}">${globalThis.___FRAMEWORK_JS_STRINGIFY___(name, _6DagR6BQRUlJATr7)}</b>!
+      <b style="background-color: #fefefe;border-radius: 10px;padding: 0px 5px;${globalThis.___FRAMEWORK_JS_STYLE_OBJECT___(bStyle)}">${globalThis.___FRAMEWORK_JS_STRINGIFY___(name, _6DagR6BQRUlJATr7)}</b>!
 
     </p>`,
         (_I54ONVap5FHL) => {

@@ -1,4 +1,5 @@
 mod error;
+mod fast_string;
 mod intrinsics;
 mod module;
 mod module_map;
@@ -10,6 +11,7 @@ pub mod futures;
 pub mod prelude;
 
 pub use error::Error;
+pub use fast_string::FastStaticString;
 pub use module::Module;
 pub use module_map::Reload;
 pub use result::Result;
