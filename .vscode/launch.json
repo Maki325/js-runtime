@@ -1,0 +1,94 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'runtime'",
+      "cargo": {
+        "args": ["test", "--no-run", "--lib", "--package=runtime"],
+        "filter": {
+          "name": "runtime",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'server'",
+      "sourceMap": {
+        "../../../../v8": "/home/marko/maki325.me/for-rusty/v8"
+      },
+      "cargo": {
+        "env": {
+          "V8_FORCE_DEBUG": "true",
+          "RUST_BACKTRACE": "1"
+        },
+        "args": ["build", "--bin=server", "--package=server"],
+        "filter": {
+          "name": "server",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'server'",
+      "cargo": {
+        "args": ["test", "--no-run", "--bin=server", "--package=server"],
+        "filter": {
+          "name": "server",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'using_js_bytecode'",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=using_js_bytecode",
+          "--package=using_js_bytecode"
+        ],
+        "filter": {
+          "name": "using_js_bytecode",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'using_js_bytecode'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=using_js_bytecode",
+          "--package=using_js_bytecode"
+        ],
+        "filter": {
+          "name": "using_js_bytecode",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}

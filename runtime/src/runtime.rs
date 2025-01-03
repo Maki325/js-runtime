@@ -1,5 +1,5 @@
 use crate::{module_map::ModuleMap, Module};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 macro_rules! get_data_mut {
   ($rt:ident) => {
@@ -42,62 +42,143 @@ pub struct Runtime {
 #[derive(Debug)]
 pub(crate) struct RuntimeData {
   pub(crate) isolate: v8::OwnedIsolate,
-  #[allow(dead_code)]
   pub(crate) context: v8::Global<v8::Context>,
-  pub(crate) handle_scope: &'static mut v8::HandleScope<'static>,
   pub(crate) waker_key: v8::Global<v8::Private>,
+
+  global_keys: HashSet<String>,
+}
+
+pub enum RuntimeOptions {
+  Default,
+  SnapshotCreator,
+  FromBlob(&'static [u8]),
 }
 
 impl RuntimeData {
-  pub fn new() -> RuntimeData {
-    let mut isolate = v8::Isolate::new(v8::CreateParams::default());
+  pub fn new(options: RuntimeOptions) -> RuntimeData {
+    let mut isolate = match options {
+      RuntimeOptions::Default => v8::Isolate::new(v8::CreateParams::default()),
+      RuntimeOptions::SnapshotCreator => {
+        v8::Isolate::snapshot_creator(None, Some(v8::CreateParams::default()))
+      }
+      RuntimeOptions::FromBlob(data) => {
+        v8::Isolate::new(v8::CreateParams::default().snapshot_blob(data))
+      }
+    };
     isolate.set_host_import_module_dynamically_callback(dynamic_import);
-    let context = Self::setup_context(&mut isolate);
+    isolate.set_promise_hook(promise_hook);
 
-    let isolate_clone = fake_clone!({ &mut isolate }, v8::OwnedIsolate);
-    let handle_scope = Box::leak(Box::new(v8::HandleScope::with_context(
-      isolate_clone,
-      &context,
-    )));
+    let (waker_key, context, global_keys) = {
+      let handle_scope = &mut v8::HandleScope::new(&mut isolate);
+      let context = if let RuntimeOptions::FromBlob(_) = options {
+        v8::Context::from_snapshot(handle_scope, 0, Default::default()).unwrap()
+      } else {
+        v8::Context::new(handle_scope, Default::default())
+      };
+      let handle_scope = &mut v8::ContextScope::new(handle_scope, context);
+      let global_keys = Self::setup_context(handle_scope, context);
 
-    let private_name = v8::String::new(handle_scope, "WakerKey").unwrap();
-    let private = v8::Private::new(handle_scope, Some(private_name));
-    let waker_key = v8::Global::new(&mut isolate, private);
+      let private_name = v8::String::new(handle_scope, "WakerKey").unwrap();
+      let private = v8::Private::new(handle_scope, Some(private_name));
+      let waker_key = v8::Global::new(handle_scope, private);
 
-    let mut runtime_data = RuntimeData {
-      isolate,
-      context,
-      handle_scope,
-      waker_key,
+      let context = v8::Global::new(handle_scope, context);
+
+      (waker_key, context, global_keys)
     };
 
-    let module_map = ModuleMap::new();
-
-    runtime_data.isolate.set_slot(module_map);
-    runtime_data.isolate.set_promise_hook(promise_hook);
+    let runtime_data = RuntimeData {
+      isolate,
+      context,
+      waker_key,
+      global_keys,
+    };
 
     return runtime_data;
   }
 
-  fn setup_context(isolate: &mut v8::Isolate) -> v8::Global<v8::Context> {
-    let handle_scope = &mut v8::HandleScope::new(isolate);
-    let context = v8::Context::new(handle_scope, Default::default());
+  pub fn handle_scope<'a>(&'a mut self) -> v8::HandleScope<'a> {
+    return v8::HandleScope::with_context(&mut self.isolate, self.context.clone());
+  }
+
+  pub fn context<'s>(&self, scope: &mut v8::HandleScope<'s, ()>) -> v8::Local<'s, v8::Context> {
+    return v8::Local::new(scope, self.context.clone());
+  }
+
+  pub fn add_global_fn(
+    &mut self,
+    name: crate::FastStaticString,
+    f: impl v8::MapFnTo<v8::FunctionCallback>,
+  ) {
+    self.global_keys.insert(name.to_string());
+
+    let context = self.context.clone();
+    let handle_scope = &mut self.handle_scope();
+    let context = v8::Local::new(handle_scope, context);
+    let context_scope = &mut v8::ContextScope::new(handle_scope, context);
+
+    let global_obj = context.global(context_scope);
+
+    let f = v8::Function::new(context_scope, f).unwrap();
+    let name = name.v8_string(context_scope);
+    global_obj.set(context_scope, name.into(), f.into());
+  }
+
+  pub fn isolate(self) -> v8::OwnedIsolate {
+    let RuntimeData {
+      mut isolate,
+      context,
+      waker_key,
+      global_keys,
+    } = self;
+
+    drop(waker_key);
 
     {
-      let context_scope = &mut v8::ContextScope::new(handle_scope, context);
+      let handle_scope = &mut v8::HandleScope::new(&mut isolate);
+      let global_scope = v8::Local::new(handle_scope, context);
 
-      let global_obj = context.global(context_scope);
+      global_scope.clear_all_slots();
 
-      let set_timeout = v8::Function::new(context_scope, crate::intrinsics::set_timeout).unwrap();
-      let name = v8::String::new(context_scope, "setTimeout").unwrap().into();
-      global_obj.set(context_scope, name, set_timeout.into());
+      {
+        let context_scope = &mut v8::ContextScope::new(handle_scope, global_scope);
+        let global = global_scope.global(context_scope);
+        for key in global_keys {
+          let key = v8::String::new(context_scope, &key).unwrap();
+          global.delete(context_scope, key.into());
+        }
+      }
 
-      let log = v8::Function::new(context_scope, crate::intrinsics::log).unwrap();
-      let name = v8::String::new(context_scope, "log").unwrap().into();
-      global_obj.set(context_scope, name, log.into());
+      let default_context = v8::Context::new(handle_scope, Default::default());
+      handle_scope.set_default_context(default_context);
+      handle_scope.add_context(global_scope);
     }
 
-    return v8::Global::new(handle_scope, context);
+    return isolate;
+  }
+
+  fn setup_context(
+    handle_scope: &mut v8::HandleScope<'_>,
+    context: v8::Local<v8::Context>,
+  ) -> HashSet<String> {
+    let mut global_keys = HashSet::new();
+
+    let context = v8::Local::new(handle_scope, &context);
+    let context_scope = &mut v8::ContextScope::new(handle_scope, context);
+
+    let global_obj = context.global(context_scope);
+
+    let set_timeout = v8::Function::new(context_scope, crate::intrinsics::set_timeout).unwrap();
+    global_keys.insert("setTimeout".to_string());
+    let name = v8::String::new(context_scope, "setTimeout").unwrap().into();
+    global_obj.set(context_scope, name, set_timeout.into());
+
+    let log = v8::Function::new(context_scope, crate::intrinsics::log).unwrap();
+    global_keys.insert("log".to_string());
+    let name = v8::String::new(context_scope, "log").unwrap().into();
+    global_obj.set(context_scope, name, log.into());
+
+    return global_keys;
   }
 }
 
@@ -126,22 +207,11 @@ extern "C" fn promise_hook(
   }
 }
 
-impl Drop for RuntimeData {
-  fn drop(&mut self) {
-    let RuntimeData { isolate, .. } = self;
-
-    // Drop all the Modules from the map
-    if let Some(module_map) = isolate.remove_slot::<ModuleMap>() {
-      module_map.drain();
-    }
-  }
-}
-
 impl Runtime {
-  pub fn new() -> Runtime {
+  pub fn new(options: RuntimeOptions) -> Runtime {
     return Runtime {
       map: ModuleMap::new(),
-      data: Box::leak(Box::new(RuntimeData::new())),
+      data: Box::leak(Box::new(RuntimeData::new(options))),
 
       waker_id: 0,
       waker_map: HashMap::new(),
@@ -152,19 +222,22 @@ impl Runtime {
 
   pub fn module_from_file<'a>(
     &'a mut self,
+    handle_scope: &mut v8::HandleScope<'_>,
     path: &str,
     reload: crate::module_map::Reload,
   ) -> Option<&'a mut Module> {
     let path = std::path::absolute(path).unwrap();
     let path = path.to_str().unwrap();
-    let handle_scope = &mut self.context_scope();
 
     return self.map.get_module(handle_scope, path, reload);
   }
 
-  pub fn context<'s>(&mut self, scope: &mut v8::HandleScope<'s, ()>) -> v8::Local<'s, v8::Context> {
-    let data = get_data_mut!(self);
-    return v8::Local::new(scope, data.context.clone());
+  pub fn handle_scope<'a>(&self) -> v8::HandleScope<'a> {
+    return get_data_mut!(self).handle_scope();
+  }
+
+  pub fn context<'s>(&self, scope: &mut v8::HandleScope<'s, ()>) -> v8::Local<'s, v8::Context> {
+    return get_data_mut!(self).context(scope);
   }
 
   pub fn waker_key<'s>(
@@ -173,34 +246,6 @@ impl Runtime {
   ) -> v8::Local<'s, v8::Private> {
     let a = get_data_mut!(self);
     return v8::Local::new(scope, a.waker_key.clone());
-  }
-
-  pub fn handle_scope(&mut self) -> &'static mut v8::HandleScope<'static> {
-    let data = get_data_mut!(self);
-    let handle_scope = &mut *data.handle_scope;
-    return fake_clone!({ handle_scope }, v8::HandleScope<'static>);
-  }
-
-  pub fn handle_scope_new<'a>(&mut self) -> v8::HandleScope<'a> {
-    let data = get_data_mut!(self);
-    let handle_scope = &mut v8::HandleScope::new(&mut data.isolate);
-
-    let ctx = self.context(handle_scope);
-    let data2 = get_data_mut!(self);
-    return v8::HandleScope::with_context(&mut data2.isolate, ctx);
-    // return fake_clone!({ handle_scope }, v8::HandleScope<'static>);
-  }
-
-  pub fn context_scope<'s>(&mut self) -> v8::ContextScope<'s, v8::HandleScope<'static>> {
-    let handle_scope = self.handle_scope();
-    let ctx = self.context(handle_scope);
-    return v8::ContextScope::new(handle_scope, ctx);
-  }
-
-  pub fn make_global<T>(&mut self, local: v8::Local<T>) -> v8::Global<T> {
-    let data = get_data_mut!(self);
-    let isolate = &mut *data.isolate;
-    return v8::Global::new(isolate, local);
   }
 
   pub fn insert_waker(&mut self, waker: std::task::Waker, id: Option<u32>) -> u32 {
@@ -244,19 +289,33 @@ impl Runtime {
   }
 
   pub fn add_global_fn(
-    &mut self,
+    &self,
     name: crate::FastStaticString,
     f: impl v8::MapFnTo<v8::FunctionCallback>,
   ) {
-    let handle_scope = self.handle_scope();
-    let context = self.context(handle_scope);
-    let context_scope = &mut v8::ContextScope::new(handle_scope, context);
+    let data = get_data_mut!(self);
+    data.add_global_fn(name, f);
+  }
 
-    let global_obj = context.global(context_scope);
+  pub fn write_blob(self) {
+    let Runtime {
+      data,
+      map,
+      waker_id: _,
+      waker_map: _,
+      enqueue_id: _,
+      enqueue_map: _,
+    } = self;
+    let data = unsafe { Box::from_raw(data) };
 
-    let f = v8::Function::new(context_scope, f).unwrap();
-    let name = name.v8_string(context_scope);
-    global_obj.set(context_scope, name.into(), f.into());
+    map.drain();
+
+    let isolate = data.isolate();
+    let data = isolate.create_blob(v8::FunctionCodeHandling::Keep);
+    std::fs::write("./blob.bin", data.unwrap()).unwrap();
+
+    println!("Blog written to file, exiting...");
+    std::process::exit(0);
   }
 
   pub fn get<'s>() -> &'s mut Self {

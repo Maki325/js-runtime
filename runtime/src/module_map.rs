@@ -9,7 +9,7 @@ pub(crate) struct ModuleMap {
   path_to_module_id: HashMap<String, ModuleId>,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Reload {
   Yes,
   No,
@@ -35,7 +35,6 @@ impl ModuleMap {
     reload: Reload,
   ) -> Option<&'a mut Module> {
     let module_exists = self.path_to_module_id.contains_key(path);
-    let rt = crate::Runtime::get();
 
     let stuff = if module_exists && reload != Reload::Yes {
       self
@@ -84,7 +83,7 @@ impl ModuleMap {
         let local_module = v8::Local::new(handle_scope, global_module);
 
         let tc = &mut v8::TryCatch::new(handle_scope);
-        let ctx = rt.context(tc);
+        let ctx = tc.get_current_context();
         ctx.set_slot(reload);
         let instantiated = local_module
           .instantiate_module(tc, Self::resolve_module)

@@ -71,9 +71,10 @@ pub fn set_timeout(
 
   tokio::spawn(async move {
     tokio::time::sleep(std::time::Duration::from_millis(timeout)).await;
-    let handle_scope = crate::prelude::handle_scope();
+    let handle_scope = &mut crate::runtime::Runtime::get().handle_scope();
     let callback = unsafe { &mut *(callback as *mut v8::Global<v8::Function>) };
-    let callback = v8::Local::new(handle_scope, callback.clone());
+    let callback = unsafe { Box::from_raw(callback) };
+    let callback = v8::Local::new(handle_scope, callback.as_ref());
 
     let this = v8::null(handle_scope);
     callback.call(handle_scope, this.into(), &[]);

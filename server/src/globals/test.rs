@@ -20,4 +20,6 @@ pub fn test(
   println!("Len before! {:#?}", item.length());
   item.set_index(handle_scope, item.length(), test.into());
   println!("Len After! {:#?}", item.length());
+
+  _rv.set(v8::Number::new(handle_scope, 420.69).into());
 }

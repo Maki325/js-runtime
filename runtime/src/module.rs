@@ -11,9 +11,11 @@ impl Module {
     return Module { path, module };
   }
 
-  pub fn get_function(&self, name: &str) -> Result<v8::Global<v8::Function>> {
-    let handle_scope = &mut crate::prelude::handle_scope();
-
+  pub fn get_function(
+    &self,
+    handle_scope: &mut v8::HandleScope<'_>,
+    name: &str,
+  ) -> Result<v8::Global<v8::Function>> {
     let module = v8::Local::new(handle_scope, self.module.clone());
 
     let module_namespace_obj = v8::Local::<v8::Object>::try_from(module.get_module_namespace())

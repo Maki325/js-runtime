@@ -11,6 +11,154 @@ mod globals;
 
 runtime::startup!(start);
 // runtime::startup!(testing);
+// runtime::startup!(blob_testing2);
+// runtime::startup!(blob_testing2, snapshot = true);
+// runtime::startup!(
+//   blob_testing3,
+//   blob = "/home/marko/maki325.me/using-js-bytecode/server/blob.bin"
+// );
+// runtime::startup!(create_blob_testing, snapshot = true);
+
+#[allow(unused)]
+async fn blob_testing3() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+  let rt = Runtime::get();
+  add_globals(rt);
+
+  {
+    let handle_scope = &mut rt.handle_scope();
+
+    let global = handle_scope.get_current_context().global(handle_scope);
+    {
+      let key = v8::String::new(handle_scope, "tts").unwrap();
+      let f = global.get(handle_scope, key.into());
+      println!("F: {f:#?} {}", f.unwrap().type_repr());
+
+      let page_fn = v8::Local::<v8::Function>::try_from(f.unwrap()).unwrap();
+      println!("F2: {page_fn:#?}");
+
+      let this = v8::null(handle_scope);
+
+      let returned_value = page_fn
+        .call(handle_scope, this.cast(), &[])
+        .ok_or("\"default\" function returned an exception!")
+        .unwrap();
+
+      println!(
+        "returned_value.type_repr(): {:#?} {:#?}",
+        returned_value.type_repr(),
+        returned_value.to_rust_string_lossy(handle_scope),
+      );
+    }
+  }
+
+  return Ok(());
+}
+
+#[allow(unused)]
+async fn create_blob_testing() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+  let rt = Runtime::get();
+  add_globals(rt);
+
+  {
+    let handle_scope = &mut rt.handle_scope();
+    let module = rt
+      .module_from_file(
+        handle_scope,
+        "/home/marko/maki325.me/using-js-bytecode/server/app/test.js",
+        runtime::Reload::No,
+      )
+      .unwrap();
+
+    let function = module.get_function(handle_scope, "default").unwrap();
+    let global = handle_scope.get_current_context().global(handle_scope);
+    let page_fn = v8::Local::new(handle_scope, function.clone());
+
+    {
+      let key = v8::String::new(handle_scope, "tts").unwrap();
+      global.set(handle_scope, key.into(), page_fn.into());
+
+      {
+        let f = global.get(handle_scope, key.into());
+        println!("F: {f:#?} {}", f.unwrap().type_repr());
+      }
+    }
+
+    let this = v8::null(handle_scope);
+
+    let returned_value = page_fn
+      .call(handle_scope, this.cast(), &[])
+      .ok_or("\"default\" function returned an exception!")
+      .unwrap();
+
+    println!(
+      "returned_value.type_repr(): {:#?} {:#?}",
+      returned_value.type_repr(),
+      returned_value.to_rust_string_lossy(handle_scope),
+    );
+  }
+
+  runtime::prelude::write_blob();
+
+  return Ok(());
+}
+
+#[allow(unused)]
+async fn blob_testing2() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+  let rt = Runtime::get();
+  add_globals(rt);
+
+  {
+    let handle_scope = &mut rt.handle_scope();
+    let module = rt
+      .module_from_file(
+        handle_scope,
+        "/home/marko/maki325.me/using-js-bytecode/server/app/test.js",
+        runtime::Reload::No,
+      )
+      .unwrap();
+
+    let function = module.get_function(handle_scope, "default").unwrap();
+
+    let page_fn = v8::Local::new(handle_scope, function.clone());
+    let this = v8::null(handle_scope);
+
+    let returned_value = page_fn
+      .call(handle_scope, this.cast(), &[])
+      .ok_or("\"default\" function returned an exception!")
+      .unwrap();
+
+    println!(
+      "returned_value.type_repr(): {:#?} {:#?}",
+      returned_value.type_repr(),
+      returned_value.to_rust_string_lossy(handle_scope),
+    );
+  }
+
+  runtime::prelude::write_blob();
+
+  return Ok(());
+}
+
+#[allow(unused)]
+async fn blob_testing() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+  let rt = Runtime::get();
+  // add_globals(rt);
+
+  {
+    let handle_scope = &mut rt.handle_scope();
+
+    rt.module_from_file(
+      handle_scope,
+      "/home/marko/maki325.me/using-js-bytecode/server/app/test.js",
+      runtime::Reload::No,
+    )
+    .unwrap();
+  }
+
+  runtime::prelude::write_blob();
+
+  return Ok(());
+}
 
 #[allow(unused)]
 async fn testing() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -18,12 +166,12 @@ async fn testing() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
   add_globals(rt);
 
   let promise = {
-    let module = rt
-      .module_from_file("./app/test.js", runtime::Reload::No)
-      .unwrap();
-    let function = module.get_function("default").unwrap();
+    let handle_scope = &mut rt.handle_scope();
 
-    let handle_scope = &mut runtime::prelude::handle_scope();
+    let module = rt
+      .module_from_file(handle_scope, "./app/test.js", runtime::Reload::No)
+      .unwrap();
+    let function = module.get_function(handle_scope, "default").unwrap();
 
     let page_fn = v8::Local::new(handle_scope, function.clone());
     let this = v8::null(handle_scope);
@@ -40,13 +188,15 @@ async fn testing() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     );
 
     let promise = v8::Local::<v8::Promise>::try_from(returned_value).unwrap();
-    runtime::futures::Promise { promise }
+    runtime::futures::Promise {
+      promise: v8::Global::new(handle_scope, promise),
+    }
   };
 
   let promise = promise.await;
 
   let _response = {
-    let handle_scope = &mut runtime::prelude::handle_scope();
+    let handle_scope = &mut rt.handle_scope();
 
     let promise = v8::Local::new(handle_scope, promise.clone());
     let state = promise.state();
@@ -169,12 +319,17 @@ async fn hello(
 > {
   let promise = {
     let rt = Runtime::get();
+    let handle_scope = &mut rt.handle_scope();
     let module = rt
-      .module_from_file("./app/page.js", runtime::Reload::Yes)
+      // .module_from_file(handle_scope, "./app/page.js", runtime::Reload::Yes)
+      .module_from_file(
+        handle_scope,
+        "/home/marko/maki325.me/using-js-bytecode/server/app/page.js",
+        runtime::Reload::Yes,
+      )
       .unwrap();
-    let function = module.get_function("default").unwrap();
+    let function = module.get_function(handle_scope, "default").unwrap();
 
-    let handle_scope = rt.handle_scope();
     let tc = &mut v8::TryCatch::new(handle_scope);
     let page_fn = v8::Local::new(tc, function.clone());
     let this = v8::null(tc);
@@ -188,7 +343,9 @@ async fn hello(
 
     if returned_value.is_promise() {
       let promise = v8::Local::<v8::Promise>::try_from(returned_value).unwrap();
-      runtime::futures::Promise { promise }
+      runtime::futures::Promise {
+        promise: v8::Global::new(tc, promise),
+      }
     } else {
       return Err("Not a promise!")?;
     }
@@ -197,7 +354,8 @@ async fn hello(
   let (obj, receiver, sender_id, value, function) = {
     let promise = promise.await;
 
-    let handle_scope = runtime::prelude::handle_scope();
+    let rt = Runtime::get();
+    let handle_scope = &mut rt.handle_scope();
     let promise = v8::Local::new(handle_scope, promise);
 
     let result = promise.result(handle_scope);
@@ -247,13 +405,14 @@ async fn hello(
     .unwrap();
 
   tokio::spawn(async move {
-    let function = function;
-    let f = function.0;
-    let obj = obj;
-    let obj = obj.0;
-
+    let rt = Runtime::get();
     let resp = {
-      let handle_scope = runtime::prelude::handle_scope();
+      let function = function;
+      let f = function.0;
+      let obj = obj;
+      let obj = obj.0;
+
+      let handle_scope = &mut rt.handle_scope();
       let f = v8::Local::new(handle_scope, f);
       let obj = v8::Local::new(handle_scope, obj);
 
@@ -262,7 +421,10 @@ async fn hello(
         panic!("Not a promise!");
       }
       runtime::futures::Promise {
-        promise: v8::Local::<v8::Promise>::try_from(val).unwrap(),
+        promise: v8::Global::new(
+          handle_scope,
+          v8::Local::<v8::Promise>::try_from(val).unwrap(),
+        ),
       }
     };
 
