@@ -1,3 +1,9 @@
+crate::ascii_str! {
+  crate,
+  NO_CALLBACK = "The \"callback\" argument must be of type function. Received undefined";
+  NO_TIMEOUT = "The \"callback\" argument must be of type function. Received undefined";
+}
+
 pub fn set_timeout(
   handle_scope: &mut v8::HandleScope,
   args: v8::FunctionCallbackArguments,
@@ -7,21 +13,13 @@ pub fn set_timeout(
 
   match args.length() {
     0 => {
-      let message = v8::String::new(
-        handle_scope,
-        "The \"callback\" argument must be of type function. Received undefined",
-      )
-      .unwrap();
+      let message = NO_CALLBACK.v8_string(handle_scope);
       let exception = v8::Exception::type_error(handle_scope, message);
       handle_scope.throw_exception(exception);
       return;
     }
     1 => {
-      let message = v8::String::new(
-        handle_scope,
-        "The \"timeout\" argument must be of type number. Received undefined",
-      )
-      .unwrap();
+      let message = NO_TIMEOUT.v8_string(handle_scope);
       let exception = v8::Exception::type_error(handle_scope, message);
       handle_scope.throw_exception(exception);
       return;

@@ -8,7 +8,228 @@ use server::globals;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 
-runtime::startup!(start);
+// runtime::startup!(testing);
+// runtime::startup!(blob_testing2);
+// runtime::startup!(blob_testing2, snapshot = true);
+// runtime::startup!(create_blob_testing, snapshot = true);
+runtime::startup!(
+  blob_testing3,
+  blob = "/home/marko/maki325.me/using-js-bytecode/experimentation/blob.bin"
+);
+
+#[allow(unused)]
+async fn blob_testing3() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+  let rt = Runtime::get();
+  add_globals(rt);
+
+  {
+    let handle_scope = &mut rt.handle_scope();
+
+    let global = handle_scope.get_current_context().global(handle_scope);
+    {
+      let key = v8::String::new(handle_scope, "tts").unwrap();
+      let f = global.get(handle_scope, key.into());
+      println!("F: {f:#?} {}", f.unwrap().type_repr());
+
+      let page_fn = v8::Local::<v8::Function>::try_from(f.unwrap()).unwrap();
+      println!("F2: {page_fn:#?}");
+
+      let this = v8::null(handle_scope);
+
+      let returned_value = page_fn
+        .call(handle_scope, this.cast(), &[])
+        .ok_or("\"default\" function returned an exception!")
+        .unwrap();
+
+      println!(
+        "returned_value.type_repr(): {:#?} {:#?}",
+        returned_value.type_repr(),
+        returned_value.to_rust_string_lossy(handle_scope),
+      );
+    }
+  }
+
+  return Ok(());
+}
+
+#[allow(unused)]
+async fn create_blob_testing() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+  let rt = Runtime::get();
+  add_globals(rt);
+
+  {
+    let handle_scope = &mut rt.handle_scope();
+    let module = rt
+      .module_from_file(
+        handle_scope,
+        "/home/marko/maki325.me/using-js-bytecode/server/app/test.js",
+        runtime::Reload::No,
+      )
+      .unwrap();
+
+    let function = module.get_function(handle_scope, "default").unwrap();
+    let global = handle_scope.get_current_context().global(handle_scope);
+    let page_fn = v8::Local::new(handle_scope, function.clone());
+
+    {
+      let key = v8::String::new(handle_scope, "tts").unwrap();
+      global.set(handle_scope, key.into(), page_fn.into());
+
+      {
+        let f = global.get(handle_scope, key.into());
+        println!("F: {f:#?} {}", f.unwrap().type_repr());
+      }
+    }
+
+    let this = v8::null(handle_scope);
+
+    let returned_value = page_fn
+      .call(handle_scope, this.cast(), &[])
+      .ok_or("\"default\" function returned an exception!")
+      .unwrap();
+
+    println!(
+      "returned_value.type_repr(): {:#?} {:#?}",
+      returned_value.type_repr(),
+      returned_value.to_rust_string_lossy(handle_scope),
+    );
+  }
+
+  runtime::prelude::write_blob();
+
+  return Ok(());
+}
+
+#[allow(unused)]
+async fn blob_testing2() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+  let rt = Runtime::get();
+  add_globals(rt);
+
+  {
+    let handle_scope = &mut rt.handle_scope();
+    let module = rt
+      .module_from_file(
+        handle_scope,
+        "/home/marko/maki325.me/using-js-bytecode/server/app/test.js",
+        runtime::Reload::No,
+      )
+      .unwrap();
+
+    let function = module.get_function(handle_scope, "default").unwrap();
+
+    let page_fn = v8::Local::new(handle_scope, function.clone());
+    let this = v8::null(handle_scope);
+
+    let returned_value = page_fn
+      .call(handle_scope, this.cast(), &[])
+      .ok_or("\"default\" function returned an exception!")
+      .unwrap();
+
+    println!(
+      "returned_value.type_repr(): {:#?} {:#?}",
+      returned_value.type_repr(),
+      returned_value.to_rust_string_lossy(handle_scope),
+    );
+  }
+
+  runtime::prelude::write_blob();
+
+  return Ok(());
+}
+
+#[allow(unused)]
+async fn blob_testing() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+  let rt = Runtime::get();
+  // add_globals(rt);
+
+  {
+    let handle_scope = &mut rt.handle_scope();
+
+    rt.module_from_file(
+      handle_scope,
+      "/home/marko/maki325.me/using-js-bytecode/server/app/test.js",
+      runtime::Reload::No,
+    )
+    .unwrap();
+  }
+
+  runtime::prelude::write_blob();
+
+  return Ok(());
+}
+
+#[allow(unused)]
+async fn testing() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+  let rt = Runtime::get();
+  add_globals(rt);
+
+  let promise = {
+    let handle_scope = &mut rt.handle_scope();
+
+    let module = rt
+      .module_from_file(handle_scope, "./app/test.js", runtime::Reload::No)
+      .unwrap();
+    let function = module.get_function(handle_scope, "default").unwrap();
+
+    let page_fn = v8::Local::new(handle_scope, function.clone());
+    let this = v8::null(handle_scope);
+
+    let returned_value = page_fn
+      .call(handle_scope, this.cast(), &[])
+      .ok_or("\"default\" function returned an exception!")
+      .unwrap();
+
+    println!(
+      "returned_value.type_repr(): {:#?} {:#?}",
+      returned_value.type_repr(),
+      returned_value.to_rust_string_lossy(handle_scope),
+    );
+
+    let promise = v8::Local::<v8::Promise>::try_from(returned_value).unwrap();
+    runtime::futures::Promise {
+      promise: v8::Global::new(handle_scope, promise),
+    }
+  };
+
+  let promise = promise.await;
+
+  let _response = {
+    let handle_scope = &mut rt.handle_scope();
+
+    let promise = v8::Local::new(handle_scope, promise.clone());
+    let state = promise.state();
+
+    match state {
+      v8::PromiseState::Rejected => {
+        let promise_result = promise.result(handle_scope);
+
+        let error_msg = promise_result
+          .to_string(handle_scope)
+          .unwrap()
+          .to_rust_string_lossy(handle_scope);
+
+        panic!("{error_msg}");
+      }
+      v8::PromiseState::Fulfilled => {
+        let promise_result = promise.result(handle_scope);
+
+        let response = promise_result
+          .to_string(handle_scope)
+          .unwrap()
+          .to_rust_string_lossy(handle_scope);
+
+        response
+      }
+      v8::PromiseState::Pending => {
+        unreachable!("Pending???");
+      }
+    }
+  };
+
+  println!("_response: {_response:#?}");
+
+  return Ok(());
+}
 
 #[allow(unused)]
 async fn shutdown_signal() {

@@ -1,10 +1,9 @@
 use runtime::v8;
 
-pub const FRAMEWORK_JS_STRINGIFY: runtime::FastStaticString =
-  runtime::ascii_str!("___FRAMEWORK_JS_STRINGIFY___");
-
-const ERROR: runtime::FastStaticString =
-  runtime::ascii_str!("Objects are not valid as a JSX child!");
+runtime::ascii_str! {
+  FRAMEWORK_JS_STRINGIFY = "___FRAMEWORK_JS_STRINGIFY___";
+  ERROR = "Objects are not valid as a JSX child!";
+}
 
 pub fn framework_js_stringify(
   handle_scope: &mut v8::HandleScope,

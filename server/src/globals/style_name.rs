@@ -4,8 +4,9 @@ use std::{
   collections::HashMap,
 };
 
-pub const FRAMEWORK_JS_STYLE_NAME: runtime::FastStaticString =
-  runtime::ascii_str!("___FRAMEWORK_JS_STYLE_NAME___");
+runtime::ascii_str! {
+  FRAMEWORK_JS_STYLE_NAME = "___FRAMEWORK_JS_STYLE_NAME___";
+}
 
 pub fn framework_js_style_name(
   handle_scope: &mut v8::HandleScope,

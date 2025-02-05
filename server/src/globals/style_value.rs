@@ -1,7 +1,8 @@
 use runtime::v8;
 
-pub const FRAMEWORK_JS_STYLE_VALUE: runtime::FastStaticString =
-  runtime::ascii_str!("___FRAMEWORK_JS_STYLE_VALUE___");
+runtime::ascii_str! {
+  FRAMEWORK_JS_STYLE_VALUE = "___FRAMEWORK_JS_STYLE_VALUE___";
+}
 
 pub fn framework_js_style_value(
   handle_scope: &mut v8::HandleScope,

@@ -1,6 +1,8 @@
 use runtime::v8;
 
-pub const TEST: runtime::FastStaticString = runtime::ascii_str!("__test__");
+runtime::ascii_str! {
+  TEST = "__test__";
+}
 
 pub fn test(
   handle_scope: &mut v8::HandleScope,

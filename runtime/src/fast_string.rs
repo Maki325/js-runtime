@@ -128,9 +128,16 @@ macro_rules! ascii_str_include {
 /// This macro creates a [`FastStaticString`].
 #[macro_export]
 macro_rules! ascii_str {
-  ($str:expr) => {{
-    const C: runtime::v8::OneByteConst =
-      runtime::FastStaticString::create_external_onebyte_const($str.as_bytes());
-    runtime::FastStaticString::new(&C)
-  }};
+  ($($name:ident = $str:expr;)*) => (
+    runtime::ascii_str!(runtime, $($name = $str;)*);
+  );
+  ($crt:ident, $($name:ident = $str:expr;)*) => (
+    $(
+      pub const $name: $crt::FastStaticString = {
+        const C: $crt::v8::OneByteConst =
+          $crt::FastStaticString::create_external_onebyte_const($str.as_bytes());
+        $crt::FastStaticString::new(&C)
+      };
+    )*
+  );
 }

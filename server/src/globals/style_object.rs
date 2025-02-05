@@ -1,8 +1,9 @@
 use super::{style_name, style_value};
 use runtime::v8;
 
-pub const FRAMEWORK_JS_STYLE_OBJECT: runtime::FastStaticString =
-  runtime::ascii_str!("___FRAMEWORK_JS_STYLE_OBJECT___");
+runtime::ascii_str! {
+  FRAMEWORK_JS_STYLE_OBJECT = "___FRAMEWORK_JS_STYLE_OBJECT___";
+}
 
 pub fn framework_js_style_object(
   handle_scope: &mut v8::HandleScope,
